@@ -3,12 +3,6 @@ class @Chosen extends AbstractChosen
   setup: ->
     @current_selectedIndex = @form_field.selectedIndex
 
-  set_default_values: ->
-    super()
-
-    # HTML Templates
-    @no_results_temp = new Template(this.get_no_results_html('#{terms}'))
-
   set_up_html: ->
     container_classes = ["chosen-container"]
     container_classes.push "chosen-container-" + (if @is_multiple then "multi" else "single")
@@ -197,7 +191,7 @@ class @Chosen extends AbstractChosen
 
     if @is_multiple
       @search_choices.select("li.search-choice").invoke("remove")
-    else if not @is_multiple
+    else
       this.single_set_selected_text()
       if @disable_search or @form_field.options.length <= @disable_search_threshold
         @search_field.readOnly = true
@@ -241,6 +235,9 @@ class @Chosen extends AbstractChosen
       @form_field.fire("chosen:maxselected", {chosen: this})
       return false
 
+    unless @is_multiple
+      @search_container.insert @search_field
+
     @container.addClassName "chosen-with-drop"
     @results_showing = true
 
@@ -256,6 +253,10 @@ class @Chosen extends AbstractChosen
   results_hide: ->
     if @results_showing
       this.result_clear_highlight()
+
+      unless @is_multiple
+        @selected_item.insert top: @search_field
+        @search_field.focus()
 
       @container.removeClassName "chosen-with-drop"
       @form_field.fire("chosen:hiding_dropdown", {chosen: this})
@@ -364,13 +365,16 @@ class @Chosen extends AbstractChosen
 
       @form_field.options[item.options_index].selected = true
       @selected_option_count = null
+      @search_field.value = ""
 
       if @is_multiple
         this.choice_build item
       else
         this.single_set_selected_text(this.choice_label(item))
 
-      unless @is_multiple && (!@hide_results_on_select || (evt.metaKey or evt.ctrlKey))
+      if @is_multiple && (!@hide_results_on_select || (evt.metaKey or evt.ctrlKey))
+        this.winnow_results()
+      else
         this.results_hide()
         this.show_search_field_default()
 
@@ -417,7 +421,7 @@ class @Chosen extends AbstractChosen
     @search_field.value
 
   get_search_text: ->
-    this.escape_html this.get_search_field_value().strip()
+    this.get_search_field_value().strip()
 
   escape_html: (text) ->
     text.escapeHTML()
@@ -432,7 +436,7 @@ class @Chosen extends AbstractChosen
     this.result_do_highlight do_high if do_high?
 
   no_results: (terms) ->
-    @search_results.insert @no_results_temp.evaluate( terms: terms )
+    @search_results.insert this.get_no_results_html(terms)
     @form_field.fire("chosen:no_results", {chosen: this})
 
   no_results_clear: ->
@@ -502,9 +506,8 @@ class @Chosen extends AbstractChosen
     width = div.measure('width') + 25
     div.remove()
 
-    container_width = @container.getWidth()
-
-    width = Math.min(container_width - 10, width)
+    if container_width = @container.getWidth()
+      width = Math.min(container_width - 10, width)
 
     @search_field.setStyle(width: width + 'px')
 
